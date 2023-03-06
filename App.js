@@ -8,12 +8,15 @@ import {
   View,
   TouchableOpacity,
   Platform,
+  TextInput,
+  RefreshControl
 } from 'react-native';
 import axios from 'axios';
 
  const API_ENDPOINT = 'https://countriesnow.space/api/v0.1/countries/capital';
  const HeaderMessage = 'List of countries';
  const ErrorMessage = 'Error on fetching data... Check your network connection!';
+ const NoCountryFound = 'No Country found';
 
 const Item = ({item, onPress, backgroundColor, textColor}) => (
   <TouchableOpacity onPress={onPress} style={[styles.item, {backgroundColor}]}>
@@ -24,27 +27,50 @@ const Item = ({item, onPress, backgroundColor, textColor}) => (
 
 const App = () => {
 
-  const [countryDetails, setCountryDetails] = useState([]);
-  const [error, setError] = useState(null);
+  const [countryMainData, setCountryMainData] = useState([]);
+  const [search, setSearch] = useState('');
+  const [searchedCountry, setSearchedCountry] = useState([]);
+  const [isError, setIsError] = useState(false);
   const [selectedId, setSelectedId] = useState();
+  const [refreshing, setRefreshing] = useState(true);
 
   useEffect(() => {
-    getCountryDetails();
+    getCountryMainData();
   }, [])
 
 
-  /* Get the World Country Details */
+  /* Get the World Country Main Data */
 
-  const getCountryDetails  = async () => {
+  const getCountryMainData  = async () => {
     try {
       const response = await axios.get(API_ENDPOINT);
       const country = response.data.data.map((country) => ({id: Math.random(), country: country.name}));
-      setCountryDetails(country);
+      setRefreshing(false);
+      setCountryMainData(country);
+      setSearchedCountry(country)
     }
     catch (err) {
-      setError(err);
+      setIsError(true);
     }
   }
+
+  const handleSearch = (text) => {
+    if (text) {
+      const newData = countryMainData.filter(
+        function (item) {
+          const itemData = item.country
+            ? item.country.toUpperCase()
+            : ''.toUpperCase();
+          const textData = text.toUpperCase();
+          return itemData.indexOf(textData) > -1;
+      });
+      setSearchedCountry(newData);
+      setSearch(text);
+    } else {
+      setSearchedCountry(countryMainData);
+      setSearch(text);
+    }
+  };
 
   const renderItem = ({item}) => {
     const backgroundColor = item.id === selectedId ? '#F5F5F5' : '#dddddd';
@@ -65,8 +91,20 @@ const App = () => {
       <View style={[styles.backgroundView, styles.headerView, {height: 40}]}>
         <Text style={[styles.message, styles.headerMessage]}>{HeaderMessage}</Text>
       </View>
+      <View style={styles.searchView}>
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="always"
+          underlineColorAndroid="transparent"
+          value={search}
+          onChangeText={searchText => handleSearch(searchText)}
+          placeholder="Search Here"
+          style={{ backgroundColor: '#fff', paddingHorizontal: 10, color: '#000' }}
+        />
+      </View>
       <FlatList
-        data={countryDetails}
+        data={searchedCountry}
         renderItem={renderItem}
         keyExtractor={item => item.id}
         extraData={selectedId}
@@ -74,10 +112,18 @@ const App = () => {
         maxToRenderPerBatch={40}
         removeClippedSubviews={true}
         updateCellsBatchingPeriod={70}
-        ListEmptyComponent={ 
-          <View style={[styles.backgroundView, styles.errorView]}>
-            <Text style={[styles.message, styles.errorMessage]}>{ErrorMessage}</Text>
+        ListEmptyComponent={
+          isError ? 
+            <View style={[styles.backgroundView, styles.errorView]}>
+              <Text style={[styles.message, styles.errorMessage]}>{ErrorMessage}</Text>
+            </View>
+           :
+          <View style={[styles.backgroundView, styles.noDataView]}>
+            <Text style={[styles.message, styles.noDataMessage]}>{NoCountryFound}</Text>
           </View>
+        }
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={getCountryMainData} />
         }
       />
     </SafeAreaView>
@@ -121,6 +167,20 @@ const styles = StyleSheet.create({
   },
   errorMessage: {
     color : 'red',
+  },
+  noDataView : {
+    backgroundColor: '#dddddd',
+  },
+  noDataMessage: {
+    color : '#000',
+  },
+  searchView:{
+    backgroundColor: '#fff',
+    marginVertical: 5,
+    borderRadius: 10,
+    borderColor: '#dddddd',
+    borderWidth: 2,
+    marginHorizontal: 16,
   },
   backgroundView : {
     // flex: 1,
